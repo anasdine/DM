@@ -8,7 +8,7 @@
   const SOLID_FRAME = 90;    // pièce face caméra, juste avant le métal liquide
   const DIR = 'frames/';
   const LERP = 0.08;         // lissage du scroll (coupé si prefers-reduced-motion)
-  const BATCH = 10;          // taille des lots de préchargement
+  const BATCH = 14;          // taille des lots de préchargement
 
   // Progression du scroll → progression vidéo, par segments linéaires.
   // 0-10 % : quasi immobile (noir, trait de lumière). 10-60 % : rotation.
@@ -105,7 +105,8 @@
   let loadedCount = 0;
   let target = scrollProgress();
   let current = target;   // pas d'effet de rattrapage au chargement
-  let drawnIdx = -1;
+  let drawnIdx = -1;      // image de base réellement dessinée
+  let drawnKey = -1;      // clé image + fraction de fondu, évite les redessins inutiles
   let rafId = 0;
   let lastTick = 0;
   let cw = 0, ch = 0;
@@ -193,28 +194,46 @@
     }
   }
 
+  // Le pas entre deux images (~45 px de scroll) serait visible tel quel :
+  // on dessine l'image inférieure puis la suivante en fondu (globalAlpha),
+  // pour une progression continue entre les 193 images.
   function render(force) {
-    const want = frameAt(current);
-    const idx = nearestIdx(want);
-    if (idx < 0 || (!force && idx === drawnIdx)) return;
-    drawnIdx = idx;
-    const img = imgs[idx];
-    ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, cw, ch);
+    const pos = mapProgress(current) * (FRAME_COUNT - 1);
+    let i0 = Math.min(FRAME_COUNT - 1, Math.floor(pos));
+    const frac = pos - i0;
+    let a = imgs[i0] ? i0 : nearestIdx(Math.round(pos));
+    if (a < 0) return;
+    const b = (a === i0 && frac > 0.01 && i0 + 1 < FRAME_COUNT && imgs[i0 + 1]) ? i0 + 1 : -1;
+    const key = a * 40 + (b >= 0 ? Math.round(frac * 32) : 36);
+    if (!force && key === drawnKey) return;
+    drawnKey = key;
+    drawnIdx = a;
+    const img = imgs[a];
     const { dx, dy, dw, dh, band } = drawParams(img);
+    if (band || dx > 0 || dy > 0 || dx + dw < cw || dy + dh < ch) {
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, cw, ch);
+    }
     ctx.drawImage(img, dx, dy, dw, dh);
+    if (b >= 0) {
+      ctx.globalAlpha = frac;
+      ctx.drawImage(imgs[b], dx, dy, dw, dh);
+      ctx.globalAlpha = 1;
+    }
     if (band) edgeFade(dx, dy, dw, dh);
   }
 
   function resize() {
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    // 1.5 max : les images viennent d'une vidéo 1280 px, au-delà le surcoût
+    // de peinture se paie en fluidité sans gain visible.
+    const dpr = Math.min(1.5, window.devicePixelRatio || 1);
     cw = window.innerWidth;
     ch = window.innerHeight;
     canvas.width = Math.round(cw * dpr);
     canvas.height = Math.round(ch * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
+    ctx.imageSmoothingQuality = 'medium';
     render(true);
     updateChrome(target);
   }
@@ -250,9 +269,10 @@
     push(0);
     push(SOLID_FRAME - 1);
     push(FRAME_COUNT - 1);
-    for (const step of [16, 8, 4, 2, 1]) {
+    for (const step of [16, 8]) {
       for (let i = 0; i < FRAME_COUNT; i += step) push(i);
     }
+    for (let i = 0; i < FRAME_COUNT; i++) push(i); // puis densité complète, du début vers la fin
     return order;
   }
 
