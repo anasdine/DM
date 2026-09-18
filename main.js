@@ -107,6 +107,9 @@
   let current = target;   // pas d'effet de rattrapage au chargement
   let drawnIdx = -1;      // image de base réellement dessinée
   let drawnKey = -1;      // clé image + fraction de fondu, évite les redessins inutiles
+  let fastMove = false;   // défilement rapide : un seul blit, le fondu serait invisible
+  let dprCap = 2;         // abaissé automatiquement si la machine ne tient pas la cadence
+  let perfAcc = 0, perfN = 0;
   let rafId = 0;
   let lastTick = 0;
   let cw = 0, ch = 0;
@@ -203,7 +206,7 @@
     const frac = pos - i0;
     let a = imgs[i0] ? i0 : nearestIdx(Math.round(pos));
     if (a < 0) return;
-    const b = (a === i0 && frac > 0.01 && i0 + 1 < FRAME_COUNT && imgs[i0 + 1]) ? i0 + 1 : -1;
+    const b = (!fastMove && a === i0 && frac > 0.01 && i0 + 1 < FRAME_COUNT && imgs[i0 + 1]) ? i0 + 1 : -1;
     const key = a * 40 + (b >= 0 ? Math.round(frac * 32) : 36);
     if (!force && key === drawnKey) return;
     drawnKey = key;
@@ -224,9 +227,9 @@
   }
 
   function resize() {
-    // 1.5 max : les images viennent d'une vidéo 1280 px, au-delà le surcoût
-    // de peinture se paie en fluidité sans gain visible.
-    const dpr = Math.min(1.5, window.devicePixelRatio || 1);
+    // 2 max : au-delà, le surcoût de peinture se paie en fluidité alors que
+    // la source (vidéo 1920 px) n'apporte plus de détail supplémentaire.
+    const dpr = Math.min(dprCap, window.devicePixelRatio || 1);
     cw = window.innerWidth;
     ch = window.innerHeight;
     canvas.width = Math.round(cw * dpr);
@@ -250,7 +253,20 @@
       current += (target - current) * k;
       if (Math.abs(target - current) < 0.0004) current = target;
     }
+    fastMove = Math.abs(target - current) > 0.004;
     render(false);
+    // Si la cadence s'effondre pendant le mouvement (machine faible),
+    // on abaisse la résolution du canvas plutôt que de saccader.
+    if (current !== target && dt < 60) {
+      perfAcc += dt; perfN++;
+      if (perfN >= 48) {
+        if (perfAcc / perfN > 22 && dprCap > 1 && (window.devicePixelRatio || 1) > dprCap - 0.5) {
+          dprCap -= 0.5;
+          resize();
+        }
+        perfAcc = 0; perfN = 0;
+      }
+    }
     if (current !== target) schedule();
   }
 
