@@ -1,0 +1,422 @@
+/* DM Surfaces — CODE1236 (démo) */
+
+:root {
+  --bg: #000000;
+  --ink: #d8dce2;
+  --ink-2: #8d95a0;
+  --line: #2a2f37;
+  --accent: #3b7cf0;
+  --font-display: "Saira Stencil One", "Saira", ui-sans-serif, system-ui, sans-serif;
+  --font-text: "Saira", ui-sans-serif, system-ui, "Helvetica Neue", Arial, sans-serif;
+  --gutter: clamp(1.5rem, 7vw, 6.5rem);
+}
+
+* { box-sizing: border-box; }
+
+html {
+  background: var(--bg);
+  scroll-behavior: auto;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-text);
+  font-weight: 300;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection { background: #24304a; color: var(--ink); }
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+/* --- Canvas + voile ------------------------------------------------------ */
+
+#film {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.veil {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(90deg,
+    rgba(0, 0, 0, 0.88) 0%,
+    rgba(0, 0, 0, 0.62) 30%,
+    rgba(0, 0, 0, 0.18) 52%,
+    rgba(0, 0, 0, 0) 66%);
+}
+
+/* Voile de fin de parcours (mobile) : évite que le contact passe sur le cadran
+   clair ; son opacité est pilotée par la progression du scroll. */
+.veil-end {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0;
+  display: none;
+  background: linear-gradient(0deg,
+    rgba(0, 0, 0, 0.97) 0%,
+    rgba(0, 0, 0, 0.86) 38%,
+    rgba(0, 0, 0, 0.5) 60%,
+    rgba(0, 0, 0, 0) 82%);
+}
+
+/* --- En-tête fixe -------------------------------------------------------- */
+
+.topbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 1.15rem clamp(1.25rem, 4vw, 2.5rem);
+  font-size: 0.85rem;
+  letter-spacing: 0.03em;
+  pointer-events: none;
+}
+
+.topbar .brand { color: var(--ink); font-weight: 500; }
+.topbar .place { color: var(--ink-2); font-weight: 400; }
+
+/* --- Jauge « croissance » ------------------------------------------------ */
+
+.gauge {
+  position: fixed;
+  right: clamp(1rem, 2.5vw, 2rem);
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.7rem;
+  pointer-events: none;
+}
+
+.gauge-label {
+  color: var(--ink-2);
+  font-size: 0.7rem;
+  letter-spacing: 0.16em;
+  writing-mode: vertical-rl;
+}
+
+.gauge-track {
+  position: relative;
+  width: 2px;
+  height: 32vh;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.gauge-fill {
+  position: absolute;
+  inset: 0;
+  background: var(--accent);
+  transform: scaleY(0);
+  transform-origin: bottom center;
+  will-change: transform;
+}
+
+.gauge-value {
+  color: var(--ink-2);
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+  min-width: 3.2em;
+  text-align: center;
+}
+
+/* --- Indicateur de chargement ------------------------------------------- */
+
+.loader {
+  position: fixed;
+  left: clamp(1.25rem, 4vw, 2.5rem);
+  bottom: 1.15rem;
+  z-index: 10;
+  color: var(--ink-2);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  display: none;
+  transition: opacity 0.6s ease;
+}
+
+.js .loader { display: block; }
+
+.loader.done { opacity: 0; visibility: hidden; }
+
+/* --- Sections ------------------------------------------------------------ */
+
+main {
+  position: relative;
+  z-index: 2;
+}
+
+.chapter {
+  min-height: 120vh;
+  min-height: 120svh;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--gutter);
+}
+
+.block { max-width: 30rem; }
+
+.js .block {
+  opacity: 0;
+  transform: translateY(26px);
+  transition: opacity 0.85s ease, transform 0.85s ease;
+}
+
+.js .block.in {
+  opacity: 1;
+  transform: none;
+}
+
+h1 {
+  margin: 0 0 1.1rem;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(3rem, 8.5vw, 7rem);
+  line-height: 0.95;
+  letter-spacing: 0.015em;
+  color: var(--ink);
+}
+
+.lede {
+  margin: 0;
+  font-size: clamp(1.05rem, 1.6vw, 1.35rem);
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+.kicker {
+  margin: 0 0 0.9rem;
+  font-size: 0.95rem;
+  font-weight: 400;
+  letter-spacing: 0.05em;
+  color: var(--ink-2);
+}
+
+.kicker.year {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  color: var(--accent);
+}
+
+h2 {
+  margin: 0 0 1.1rem;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(1.7rem, 3.1vw, 2.55rem);
+  line-height: 1.12;
+  color: var(--ink);
+}
+
+.chapter p {
+  margin: 0;
+  font-size: clamp(1rem, 1.25vw, 1.125rem);
+  line-height: 1.68;
+  color: var(--ink);
+}
+
+.materials {
+  list-style: none;
+  margin: 1.7rem 0 0;
+  padding: 0;
+}
+
+.materials li {
+  padding: 0.6rem 0;
+  border-top: 1px solid var(--line);
+  font-size: 1rem;
+  font-weight: 400;
+}
+
+.materials li:last-child { border-bottom: 1px solid var(--line); }
+
+.address {
+  margin-top: 1.5rem !important;
+  color: var(--ink-2) !important;
+  font-size: 0.95rem !important;
+}
+
+.cta {
+  display: inline-block;
+  margin-top: 1.15rem;
+  padding: 0.85rem 1.6rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--ink);
+  text-decoration: none;
+  font-size: 0.95rem;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  transition: border-color 0.25s ease, background-color 0.25s ease;
+}
+
+.cta:hover {
+  border-color: #5a6472;
+  background-color: rgba(216, 220, 226, 0.07);
+}
+
+/* --- Hero ----------------------------------------------------------------- */
+
+.hero { position: relative; }
+
+.scroll-hint {
+  position: absolute;
+  left: var(--gutter);
+  top: calc(100svh - 6.5rem);
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  color: var(--ink-2);
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  transition: opacity 0.5s ease;
+}
+
+.scrolled .scroll-hint { opacity: 0; }
+
+.hint-line {
+  position: relative;
+  display: block;
+  width: 1px;
+  height: 44px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.hint-line::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 16px;
+  background: var(--ink);
+  animation: hintDrop 2.2s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+
+@keyframes hintDrop {
+  from { transform: translateY(-18px); }
+  to   { transform: translateY(46px); }
+}
+
+/* --- Pied de page ---------------------------------------------------------- */
+
+.foot {
+  position: relative;
+  z-index: 2;
+  background: var(--bg);
+  border-top: 1px solid var(--line);
+  padding: 2rem var(--gutter) 2.2rem;
+}
+
+.foot p {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 0.8rem;
+  line-height: 1.6;
+  max-width: 40rem;
+}
+
+/* --- Canvas indisponible : dernière image en fond fixe -------------------- */
+
+.no-canvas #film, .no-canvas .loader { display: none; }
+
+.no-canvas body {
+  background-color: var(--bg);
+  background-image: url("frames/f_0193.jpg");
+  background-image: image-set(
+    url("frames/f_0193.webp") type("image/webp"),
+    url("frames/f_0193.jpg") type("image/jpeg"));
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+  background-attachment: fixed;
+}
+
+.no-canvas .block { opacity: 1 !important; transform: none !important; }
+
+/* --- Mobile ---------------------------------------------------------------- */
+
+@media (max-width: 860px) {
+
+  .veil {
+    background: linear-gradient(0deg,
+      rgba(0, 0, 0, 0.94) 0%,
+      rgba(0, 0, 0, 0.78) 28%,
+      rgba(0, 0, 0, 0.4) 48%,
+      rgba(0, 0, 0, 0) 66%);
+  }
+
+  .veil-end { display: block; }
+
+  .chapter {
+    align-items: flex-end;
+    padding: 0 1.4rem;
+  }
+
+  .block {
+    max-width: 34rem;
+    padding-bottom: 16svh;
+  }
+
+  .hero .block { padding-bottom: 36svh; }
+
+  .contact .block { padding-bottom: 6svh; }
+
+  .scroll-hint {
+    left: 1.4rem;
+    top: calc(100svh - 6rem);
+  }
+
+  .gauge {
+    top: auto;
+    right: 1.4rem;
+    bottom: 1rem;
+    left: 1.4rem;
+    transform: none;
+    flex-direction: row;
+    gap: 0.8rem;
+  }
+
+  .gauge-label { writing-mode: horizontal-tb; letter-spacing: 0.14em; }
+
+  .gauge-track { width: auto; height: 2px; flex: 1; }
+
+  .gauge-fill { transform: scaleX(0); transform-origin: left center; }
+
+  .gauge-value { min-width: 3em; text-align: right; }
+
+  .loader { left: 1.4rem; bottom: 2.6rem; }
+
+  .foot { padding-bottom: 4.6rem; }
+}
+
+/* --- Mouvement réduit ------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .hint-line::after { animation: none; }
+  .js .block { transition: none; }
+  .scroll-hint, .loader { transition: none; }
+}
